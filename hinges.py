@@ -2,7 +2,7 @@
 from prody import *
 import numpy as np
 from bio.cast import *
-from bio.hinge_atlas_parser import *
+from bio.morphs_atlas_parser import *
 import os
 from pathlib import Path
 import operator
@@ -623,7 +623,7 @@ def print_morph_hinges_results(atlas_morphs, atlas_directory, morph_id, raptor_f
 
 
 def print_all_morphs_results():
-    atlas_morphs = parse_hinge_atlas_text('./hingeatlas.txt')
+    atlas_morphs = parse_morphs_atlas_from_text('./hingeatlas.txt')
     atlas_directory = '/Users/mataneilat/Downloads/hinge_atlas_nonredundant'
 
     directory = os.fsencode(atlas_directory)

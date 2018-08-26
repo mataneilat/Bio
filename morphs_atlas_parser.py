@@ -1,5 +1,4 @@
 
-
 class AtlasResidueInfo:
 
     def __init__(self, morph_id, residue_idx, residue_type, is_hinge):
@@ -40,7 +39,7 @@ def parse_atlas_residue(line):
     return AtlasResidueInfo(morph_id, residue_idx, residue_type, is_hinge)
 
 
-def parse_hinge_atlas_text(txt_file):
+def parse_morphs_atlas_from_text(txt_file):
     morphs = []
     current_morph = None
     with open(txt_file) as f:
@@ -54,11 +53,14 @@ def parse_hinge_atlas_text(txt_file):
                 current_morph = AtlasMorph(atlas_residue.morph_id)
             current_morph.add_residue(atlas_residue)
 
-    return morphs
+    return {morph.morph_id:morph for morph in morphs}
+
+
+
 
 
 def main():
-    morphs = parse_hinge_atlas_text('./hingeatlas.txt')
+    morphs = parse_morphs_atlas_from_text('./hingeatlas.txt')
     for morph in morphs:
         print(morph.morph_id, morph.get_hinges())
 
