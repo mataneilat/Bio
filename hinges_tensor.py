@@ -10,7 +10,6 @@ from bio.gnm_utils import *
 import tensorflow as tf
 from tensorflow import keras
 
-
 morphs_repository = MorphsRepository(parse_morphs_atlas_from_text('./hingeatlas.txt'),
                                     '/Users/mataneilat/Downloads/hinge_atlas_nonredundant')
 
@@ -127,7 +126,7 @@ def main():
         print("DEFAULT HINGES: ", default_hinges, default_score)
         print("ML HINGES:", ml_hinges, ml_score)
 
-    morphs_repository.perform_on_some_morphs_in_directory(lambda morph_id : morph_id in morph_to_predicted_hinges,
+    morphs_repository.perform_on_some_morphs_in_directory(lambda morph_id : morph_id in test_morph_ids,
             print_prediction_results, hinges_dict=morph_to_predicted_hinges)
 
     print("ML SCORE IS: ", total_ml_score)

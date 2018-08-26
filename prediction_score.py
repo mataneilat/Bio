@@ -1,7 +1,8 @@
 
 import numpy as np
+import math
 
-def score_prediction(predicted_hinges, annotated_hinges, total_residue_count, match_range=2, score_alpha=0.8):
+def score_prediction(predicted_hinges, annotated_hinges, total_residue_count, match_range=2, beta=1):
     """
     Assigns score to a given prediction with respected to the given annotated hinges
 
@@ -16,23 +17,41 @@ def score_prediction(predicted_hinges, annotated_hinges, total_residue_count, ma
         A score for the prediction
     """
 
-    predicted_annotated_list = [False] * len(predicted_hinges)
-    annotated_predicted = 0
+    annotated_hinges_considered_predicted = set()
+    predicted_hinges_considered_annotated = set()
+
+
     for annotated_hinge in annotated_hinges:
-        was_predicted = False
-        for i, predicted_hinge in enumerate(predicted_hinges):
+        for predicted_hinge in predicted_hinges:
             if annotated_hinge in range(predicted_hinge - match_range, predicted_hinge + match_range + 1):
-                was_predicted = True
-                predicted_annotated_list[i] = True
-        if was_predicted:
-            annotated_predicted += 1
-    predicated_annotated = sum([1 if x else 0 for x in predicted_annotated_list])
-    annotated_predicted_percentage = annotated_predicted / len(annotated_hinges)
-    predicated_annotated_percentage = predicated_annotated / len(predicted_hinges)
+                annotated_hinges_considered_predicted.add(annotated_hinge)
+                predicted_hinges_considered_annotated.add(predicted_hinge)
 
-    punish = float(len(predicted_hinges)) / total_residue_count
 
-    return score_alpha * annotated_predicted_percentage + (1-score_alpha) * predicated_annotated_percentage - punish
+    all_residues = set(range(total_residue_count))
+    condition_positives = set(annotated_hinges)
+    condition_negatives = all_residues - condition_positives
+
+    predicted_condition_positives = set(predicted_hinges)
+    predicted_condition_negatives = all_residues - predicted_condition_positives
+
+    true_positives = condition_positives & annotated_hinges_considered_predicted
+    TP = len(true_positives)
+
+    false_positives = (condition_negatives & predicted_condition_positives) - predicted_hinges_considered_annotated
+    FP = len(false_positives)
+
+    false_negatives = (condition_positives & predicted_condition_negatives) - annotated_hinges_considered_predicted
+    FN = len(false_negatives)
+
+    true_negatives = condition_negatives & predicted_condition_negatives
+    TN = len(true_negatives)
+
+    nom = float(TP * TN - FP * FN)
+    denom = math.sqrt((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))
+    if denom == 0:
+        denom = 1
+    return nom / denom
 
 
 def predict_hinges(predicted_confidence_levels, local_sensitivity=7, max_mean_alpha=0.9, total_max_beta=0.7):
@@ -70,3 +89,47 @@ def predict_hinges(predicted_confidence_levels, local_sensitivity=7, max_mean_al
             continue
         hinges.append(i)
     return hinges
+
+
+# def score_prediction(predicted_hinges, annotated_hinges, total_residue_count, match_range=2, beta=1):
+#     """
+#     Assigns score to a given prediction with respected to the given annotated hinges
+#
+#     Arguments:
+#         predicted_hinges:       List of predicted hinges
+#         annotated_hinges:       List of annotated hinges (The "ground truth")
+#         total_residue_count:    Integer representing the number of total number of residues.
+#         match_range:            The range for which which a prediction is considered as match.
+#         score_alpha:            The alpha parameters used to weight the score.
+#
+#     Returns:
+#         A score for the prediction
+#     """
+#
+#     condition_positive = annotated_hinges
+#     condition_positive_count = len(condition_positive)
+#
+#     predicted_annotated_list = [False] * len(predicted_hinges)
+#
+#     true_positive_count = 0
+#
+#     for annotated_hinge in annotated_hinges:
+#         was_predicted = False
+#         for i, predicted_hinge in enumerate(predicted_hinges):
+#             if annotated_hinge in range(predicted_hinge - match_range, predicted_hinge + match_range + 1):
+#                 was_predicted = True
+#                 predicted_annotated_list[i] = True
+#         if was_predicted:
+#             true_positive_count += 1
+#
+#     true_positive_rate = float(true_positive_count) / condition_positive_count
+#
+#     condition_negative_count = total_residue_count - condition_positive_count
+#     true_negative_count = sum([1 if x else 0 for x in predicted_annotated_list])
+#
+#     true_negative_rate = float(true_negative_count) / condition_negative_count
+#     one_minus_true_negative_rate = 1 - true_negative_rate
+#
+#     beta2 = beta * beta
+#     return (1 + beta2) * ((true_positive_rate * one_minus_true_negative_rate) / (beta2 * true_positive_rate + one_minus_true_negative_rate))
+#
