@@ -51,7 +51,7 @@ class GammaDistance(Gamma):
         pass
 
     def gamma(self, dist2, i, j):
-        s = 1 - dist2 / 100.0
+        s = 1 - dist2 / 64.0
         return s * s
 
 
@@ -68,7 +68,7 @@ def calc_data_for_sub_matrix(sub_matrix):
 def calc_gnm_k_inv(ubi, header, raptor_matrix):
     gnm = GNM('Ubiquitin')
     if raptor_matrix is None:
-        gnm.buildKirchhoff(ubi, cutoff=10, gamma=GammaDistance())
+        gnm.buildKirchhoff(ubi, cutoff=8, gamma=GammaDistance())
     else:
         gnm.buildKirchhoff(ubi, cutoff=8, gamma=GammaRaptor(raptor_matrix))
 
@@ -82,159 +82,66 @@ def calc_gnm_k_inv(ubi, header, raptor_matrix):
     (m, n) = V.shape
 
     k_inv = np.zeros((m,m))
-    for i in range(1):
+    for i in range(2):
         eigenvalue = eigvals[i]
         eigenvector = V[:,i]
         k_inv += (np.outer(eigenvector, eigenvector) / eigenvalue)
     return k_inv
 
 
-def prepare_train_data_for_morph(atlas_morphs, atlas_directory, morph_id):
+def prepare_train_data(training_morphs_list):
 
     train_data = []
     train_labels = []
 
-    morph = atlas_morphs.get(morph_id)
-    if morph is None:
-        return None, None
+    def add_training_data_for_morph(morph, ubi, header):
+        nonlocal train_data, train_labels
+        if morph.morph_id not in training_morphs_list:
+            return
 
-    annotated_hinges = morph.get_hinges()
+        k_inv = calc_gnm_k_inv(ubi, header, None)
+        (m,n) = k_inv.shape
 
-    ff0_path = '%s/%s/ff0.pdb' % (atlas_directory, morph_id)
-    if Path(ff0_path).is_file():
-        with open(ff0_path, 'r') as pdb_file:
+        annotated_hinges = morph.get_hinges()
 
-            ubi, header = parsePDB(ff0_path, subset='calpha', header=True)
-            k_inv = calc_gnm_k_inv(ubi, header, None)
+        morph_train_data = []
+        morph_train_labels = []
 
-           # k_inv = normalize_matrix(k_inv)
+        for i in range(sensitivity, m-sensitivity):
+            morph_train_data.append(get_maximum_sub_matrix_around_diagonal_element(k_inv, i, sensitivity))
+            morph_train_labels.append(1 if i in annotated_hinges else 0)
 
-            (m,n) = k_inv.shape
-            for i in range(sensitivity, m-sensitivity):
-               # residue_data = calc_data_for_sub_matrix(get_maximum_sub_matrix_around_diagonal_element(k_inv, i, sensitivity))
-                train_data.append(get_maximum_sub_matrix_around_diagonal_element(k_inv, i, sensitivity))
-                train_labels.append(1 if i in annotated_hinges else 0)
+        train_data += morph_train_data
+        train_labels += morph_train_labels
+
+    perform_for_all_morphs(add_training_data_for_morph)
 
     return train_data, train_labels
 
 
-
-def prepare_train_data():
-
-    directory = os.fsencode(atlas_directory)
-
-    train_data = []
-    train_labels = []
-
-    for file in os.listdir(directory):
-        morph_filename = os.fsdecode(file)
-        morph_train_data, morph_train_labels = prepare_train_data_for_morph(atlas_morphs, atlas_directory, morph_filename)
-        if morph_train_data is not None and morph_train_labels is not None:
-            train_data += morph_train_data
-            train_labels += morph_train_labels
-
-    train_data = np.array(train_data)
-    train_data = train_data.reshape(train_data.shape[0], train_data.shape[1], train_data.shape[2], 1)
-    return train_data, train_labels
-
-def train_model():
+def train_model(training_morphs_list):
 
     dim = sensitivity * 2 + 1
     model = keras.Sequential([
        # keras.layers.BatchNormalization(),
-        keras.layers.Conv2D(data_format="channels_last", input_shape=(dim,dim,1),
-                            filters=1, kernel_size=[3, 3], activation=tf.nn.relu),
-      #  keras.layers.MaxPooling2D(pool_size=(2,2)),
+       keras.layers.Conv2D(data_format="channels_last", input_shape=(dim,dim,1),
+                           filters=8, kernel_size=[2, 2], activation=tf.nn.relu),
         keras.layers.Flatten(),
         keras.layers.Dense(4, activation=tf.nn.relu),
         keras.layers.Dense(1, activation=tf.nn.sigmoid)
     ])
 
-    model.compile(optimizer=tf.train.AdamOptimizer(), loss='mean_squared_error', metrics=['accuracy'])
+    model.compile(optimizer=tf.train.AdamOptimizer(), loss='binary_crossentropy', metrics=['accuracy'])
 
-    train_data, train_labels = prepare_train_data()
+    train_data, train_labels = prepare_train_data(training_morphs_list)
 
-    model.fit(train_data, np.array(train_labels), epochs=5)
-
-    return model
-
-
-def prepare_model_2_data_for_residue(prediction_mean, prediction, i, is_annotated_hinge):
-  #  diff = prediction[i] - prediction_mean
-    data = prediction[i-10:i+10]
-
-    label = 0
-    if is_annotated_hinge:
-        label = 1
-    return np.array(data), label
-
-
-def prepare_data_for_model_2(model1_predictions):
-
-    train_data = []
-    train_labels = []
-    for morph, prediction in model1_predictions.items():
-
-        annotated_hinges = atlas_morphs[morph].get_hinges()
-
-        m = len(prediction)
-
-        prediction_mean = np.mean(prediction)
-
-        for i in range(sensitivity + 5, m-sensitivity - 5):
-            is_annotated = i in annotated_hinges
-            residue_data, residue_label = prepare_model_2_data_for_residue(prediction_mean, prediction, i, is_annotated)
-            train_data.append(residue_data)
-            train_labels.append(residue_label)
-
-    return np.array(train_data), train_labels
-
-
-def train_model_2(model1_predictions):
-
-    train_data, train_labels = prepare_data_for_model_2(model1_predictions)
-
-    model = keras.Sequential([
-       # keras.layers.BatchNormalization(),
-
-        keras.layers.Dense(4, activation=tf.nn.relu),
-        keras.layers.Dense(1, activation=tf.nn.sigmoid)
-    ])
-
-    model.compile(optimizer=tf.train.AdamOptimizer(), loss='mean_squared_error', metrics=['accuracy'])
+    # Reshape data for model
+    train_data = np.array(train_data)
+    train_data = train_data.reshape(train_data.shape[0], train_data.shape[1], train_data.shape[2], 1)
 
     model.fit(train_data, np.array(train_labels), epochs=5)
 
     return model
-
-
-
-def get_model2_predictions(model, model1_predictions):
-
-    for morph, prediction in model1_predictions.items():
-
-        annotated_hinges = atlas_morphs[morph].get_hinges()
-        print("ANNOTATED HINGES:", annotated_hinges)
-
-        m = len(prediction)
-
-        prediction_mean = np.mean(prediction)
-
-        predictions = [0] * m
-
-        for i in range(sensitivity + 5, m-sensitivity - 5):
-            is_annotated = False
-            if i in annotated_hinges:
-                is_annotated = True
-            residue_data, residue_label = prepare_model_2_data_for_residue(prediction_mean, prediction, i, is_annotated)
-            result = model.predict(np.array([residue_data]))
-            predictions[i] = result
-
-        # PLOT
-        plt.plot(predictions)
-        plt.ylabel('some numbers')
-        plt.show()
-
 
 
 def get_predictions(model, ubi, header):
@@ -279,7 +186,7 @@ def perform_for_all_morphs(func, **kwargs):
 
 def print_morph_hinges_results(the_model, morph_id, raptor_file=None):
 
-    def plot_results(morph, ubi, header, model=model):
+    def plot_results(morph, ubi, header, model):
         print("Morph: ", morph.morph_id)
         print("Annotated Hinges: ", morph.get_hinges())
         print("Default Hinges: ", get_hinges_default(ubi, header))
@@ -297,11 +204,14 @@ def print_all_morphs_results(model):
         print_morph_hinges_results(model, morph_filename)
 
 
-def collect_predictions_all_morphs(the_model):
+def collect_prediction_scores(the_model, morphs_test_list):
     results = {}
 
     def collect_predictions(morph, ubi, header, model):
         nonlocal results
+        if morph.morph_id not in morphs_test_list:
+            return
+
         predictions = get_predictions(model, ubi, header)
         results[morph.morph_id] = predictions
 
@@ -310,40 +220,90 @@ def collect_predictions_all_morphs(the_model):
 
 
 
-def predict_hinges(model):
-    predictions = collect_predictions_all_morphs(model)
+def predict_hinges(model, morphs_to_prediction_scores):
     morph_to_hinges = {}
-    for morph, prediction in predictions.items():
-        m = len(prediction)
+    for morph, prediction_scores in morphs_to_prediction_scores.items():
+        m = len(prediction_scores)
         hinges = []
 
-        total_max = max(prediction)
+        total_max = max(prediction_scores)
         for i in range(sensitivity, m-sensitivity):
-            prediction_subset = prediction[max(0, i - sensitivity):min(m, i + sensitivity)]
+            prediction_subset = prediction_scores[max(0, i - sensitivity):min(m, i + sensitivity)]
             subset_max = max(prediction_subset)
             subset_mean = np.mean(np.array(prediction_subset))
             alpha = 0.9
-            if prediction[i] < alpha * subset_max + (1-alpha) * subset_mean:
+            if prediction_scores[i] < alpha * subset_max + (1-alpha) * subset_mean:
                 continue
-            if prediction[i] < 0.7 * total_max:
+            if prediction_scores[i] < 0.7 * total_max:
                 continue
             hinges.append(i)
         morph_to_hinges[morph] = hinges
     return morph_to_hinges
 
+def score_prediction(predicted_hinges, annotated_hinges, total_residue_count):
+    prediction_range = 2
+    predicted_annotated_list = [False] * len(predicted_hinges)
+    annotated_predicted = 0
+    for annotated_hinge in annotated_hinges:
+        was_predicted = False
+        for i, predicted_hinge in enumerate(predicted_hinges):
+            if annotated_hinge in range(predicted_hinge - prediction_range, predicted_hinge + prediction_range + 1):
+                was_predicted = True
+                predicted_annotated_list[i] = True
+        if was_predicted:
+            annotated_predicted += 1
+    predicated_annotated = sum([1 if x else 0 for x in predicted_annotated_list])
+    annotated_predicted_percentage = annotated_predicted / len(annotated_hinges)
+    predicated_annotated_percentage = predicated_annotated / len(predicted_hinges)
 
-if __name__ == '__main__':
-    model = train_model()
-    morph_to_hinges = predict_hinges(model)
+    punish = float(len(predicted_hinges)) / total_residue_count
+
+    return 0.8 * annotated_predicted_percentage + 0.2 * predicated_annotated_percentage - punish
+
+
+def main():
+    morphs_ids = list(atlas_morphs.keys())
+
+    train_morph_ids = morphs_ids[:150]
+    test_morph_ids = morphs_ids[150:]
+    model = train_model(train_morph_ids)
+    prediction_scores = collect_prediction_scores(model, test_morph_ids)
+
+    morph_to_hinges = predict_hinges(model, prediction_scores)
+
+    total_ml_score = 0
+    total_default_score = 0
 
     def print_prediction_results(morph, ubi, header, hinges_dict):
-        print("PREDICTED:", hinges_dict[morph.morph_id])
+        nonlocal total_ml_score, total_default_score
+        if morph.morph_id not in hinges_dict:
+            return
+
+        total_residue_count = len(morph.residues)
+
+        ml_hinges = hinges_dict[morph.morph_id]
+        ml_score = score_prediction(ml_hinges, morph.get_hinges(), total_residue_count)
+        total_ml_score += ml_score
+
+        default_hinges = get_hinges_default(ubi, header)
+        default_score = score_prediction(default_hinges, morph.get_hinges(), total_residue_count)
+        total_default_score += default_score
+
         print("Annotated Hinges: ", morph.get_hinges())
+        print("DEFAULT HINGES: ", default_hinges, default_score)
+        print("ML HINGES:", ml_hinges, ml_score)
+
 
     perform_for_all_morphs(print_prediction_results, hinges_dict=morph_to_hinges)
+    print("ML SCORE IS: ", total_ml_score)
+    print("DEFAULT SCORE IS: ", total_default_score)
+
+
+if __name__ == '__main__':
+    main()
 
 #    print_morph_hinges_results(model, atlas_morphs, atlas_directory, '06487-15304')
-    print_all_morphs_results(model)
+#    print_all_morphs_results(model)
 
 #     predictions = collect_predictions_all_morphs(model)
 #
