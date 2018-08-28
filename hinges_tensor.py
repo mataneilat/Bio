@@ -20,7 +20,7 @@ def prepare_train_data(training_morphs_list):
     train_data = []
     train_labels = []
 
-    def add_training_data_for_morph(morph, ubi, header):
+    def add_training_data_for_morph(morph, file_path, ubi, header):
         nonlocal train_data, train_labels
 
         k_inv = calc_gnm_k_inv(ubi, header, None)
@@ -86,14 +86,13 @@ def predict_morphs_hinges(the_model, morphs_test_list):
 
     def collect_predictions(morph, ubi, header, model):
         nonlocal results
-        if morph.morph_id not in morphs_test_list:
-            return
 
         predicted_confidence_levels = predict_confidence_levels(model, ubi, header)
         predicted_hinges = predict_hinges(predicted_confidence_levels)
         results[morph.morph_id] = predicted_hinges
 
-    morphs_repository.perform_on_all_morphs_in_directory(collect_predictions, model=the_model)
+    morphs_repository.perform_on_some_morphs_in_directory(lambda x : x in morphs_test_list,
+            collect_predictions, model=the_model)
     return results
 
 
@@ -109,7 +108,7 @@ def main():
     total_ml_score = 0
     total_default_score = 0
 
-    def print_prediction_results(morph, ubi, header, hinges_dict):
+    def print_prediction_results(morph, file_path, ubi, header, hinges_dict):
         nonlocal total_ml_score, total_default_score
 
         total_residue_count = len(morph.residues)

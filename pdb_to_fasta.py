@@ -2,21 +2,39 @@
 from Bio import PDB
 from Bio import SeqIO
 from Bio.SeqIO import PdbIO
+from bio.morphs_repository import *
+from bio.morphs_atlas_parser import *
+from bio.utils import *
+
+morphs_repository = MorphsRepository(parse_morphs_atlas_from_text('./hingeatlas.txt'),
+                                    '/Users/mataneilat/Downloads/hinge_atlas_nonredundant')
 
 def main():
-    pdbList = PDB.PDBList()
-    #pdb = '1ggg'
-    #pdb_fn = pdbList.retrieve_pdb_file(pdb, file_format="pdb")
 
-    pdb = '663817-9353'
-    pdb_fn = '/tmp/663817-9353/ff0.pdb'
-    with open(pdb_fn) as handle:
-        records = PdbIO.PdbAtomIterator(handle)
-        records_list = list(records)
+    morphs_ids = list(morphs_repository.atlas_morphs.keys())
 
-        with open("/tmp/%s.txt" % pdb, "w") as out_file:
-            SeqIO.write(records_list, out_file, "fasta")
-            out_file.close()
+    morphs_chunks = list(partition_generator(morphs_ids, 20))
+
+    def pdb_to_fasta(morph, file_path, ubi, header, out_dir, batch_name):
+        morph_id = morph.morph_id
+        with open("%s/%s.fasta" % (out_dir, batch_name), "a") as out_file:
+            with open(file_path) as handle:
+                records = PdbIO.PdbAtomIterator(handle)
+                records_list = list(records)
+                if len(records_list) > 1:
+                    raise ValueError("Only one sequence is expected")
+                records_list[0].id = morph_id
+                records_list[0].description = ''
+                SeqIO.write(records_list, out_file, "fasta")
+
+
+    for batch_count, morphs_chunk in enumerate(morphs_chunks):
+        morphs_repository.perform_on_some_morphs_in_directory(lambda x: x in morphs_chunk,
+                                                              pdb_to_fasta, out_dir="/Users/mataneilat/Documents/BioInfo/raptor_input",
+                                                              batch_name="batch_%s" % batch_count)
+
+
+
 
 if __name__ == '__main__':
     main()

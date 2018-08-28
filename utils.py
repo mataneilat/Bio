@@ -19,6 +19,11 @@ def normalize_matrix(M):
     return (M - xmin)/(xmax - xmin)
 
 
+def partition_generator(l, n):
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
+
+
 def get_block_metrics_around_center(matrix):
     (r1,r2) = matrix.shape
 
@@ -78,7 +83,7 @@ def fold_matrix_around_center(matrix, max_delta=5):
 def flatten_list(l):
     return [item for sublist in l for item in sublist]
 
-class TestFoldMethods(unittest.TestCase):
+class TestUtilities(unittest.TestCase):
 
     def test_fold(self):
         matrix = np.array([[1,2,3,4], [5,6,7,8], [9,10,11,12], [13,14,15,16]])
@@ -86,6 +91,10 @@ class TestFoldMethods(unittest.TestCase):
         self.assertEqual(fold_matrix_around_diagonal_element(matrix, 1), [6, 1, 5, 9 , 10, 11, 7, 3, 2])
         self.assertEqual(fold_matrix_around_diagonal_element(matrix, 2), [11, 6, 10, 14, 15, 16, 12, 8, 7])
         self.assertEqual(fold_matrix_around_diagonal_element(matrix, 3), [16])
+
+    def test_partition_generator(self):
+        self.assertEqual(list(partition_generator(list(range(5, 18)), 5)), [[5,6,7,8,9],[10,11,12,13,14],[15,16,17]])
+
 
 if __name__ == '__main__':
     unittest.main()

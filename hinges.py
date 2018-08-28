@@ -12,6 +12,7 @@ import itertools
 from bio.gnm_utils import *
 from bio.prediction_score import *
 from bio.morphs_repository import *
+from bio.contact_map_repository import ContactMapRepository
 import math
 import matplotlib.pyplot as plt
 
@@ -21,8 +22,7 @@ morphs_repository = MorphsRepository(parse_morphs_atlas_from_text('./hingeatlas.
 
 local_sensitivity = 7
 
-def get_my_hinges_with_correlation_simplest(ubi, header, raptor_matrix):
-    k_inv = calc_gnm_k_inv(ubi, header, raptor_matrix)
+def get_my_hinges_with_correlation_simplest(k_inv):
 
     (m,n) = k_inv.shape
 
@@ -34,9 +34,7 @@ def get_my_hinges_with_correlation_simplest(ubi, header, raptor_matrix):
     return predict_hinges(correlations)
 
 
-def get_my_gnm_hinges_with_correlation_distance(ubi, header, raptor_matrix):
-
-    k_inv = calc_gnm_k_inv(ubi, header, raptor_matrix)
+def get_my_gnm_hinges_with_correlation_distance(k_inv):
 
     (m,n) = k_inv.shape
 
@@ -49,9 +47,7 @@ def get_my_gnm_hinges_with_correlation_distance(ubi, header, raptor_matrix):
     return predict_hinges(correlations)
 
 
-def get_hinges_using_cross_correlation_avgs(ubi, header, raptor_matrix):
-
-    k_inv = calc_gnm_k_inv(ubi, header, raptor_matrix)
+def get_hinges_using_cross_correlation_avgs(k_inv):
 
     (m,n) = k_inv.shape
 
@@ -75,9 +71,8 @@ def get_hinges_using_cross_correlation_avgs(ubi, header, raptor_matrix):
     return predict_hinges(prediction_scores)
 
 
-def get_hinges_using_cross_correlation_avg(ubi, header, raptor_matrix):
+def get_hinges_using_cross_correlation_avg(k_inv):
 
-    k_inv = calc_gnm_k_inv(ubi, header)
     (n,m) = k_inv.shape
 
     prediction_scores = [0] * m
@@ -96,9 +91,8 @@ def get_hinges_using_cross_correlation_avg(ubi, header, raptor_matrix):
 
 
 
-def get_hinges_using_cross_correlation_negative(ubi, header, raptor_matrix):
+def get_hinges_using_cross_correlation_negative(k_inv):
 
-    k_inv = calc_gnm_k_inv(ubi, header)
     (n,m) = k_inv.shape
 
     expected_negative_percentage = 0.7
@@ -121,64 +115,66 @@ def get_hinges_using_cross_correlation_negative(ubi, header, raptor_matrix):
 
 
 def main():
+
+    contact_map_repository = ContactMapRepository('/Users/mataneilat/Documents/BioInfo/raptor_output/contact_maps')
     morphs_ids = list(morphs_repository.atlas_morphs.keys())
 
-    test_morph_ids = morphs_ids[150:]
+    test_morph_ids = morphs_ids
 
-    total_my_score_1 = 0
-    total_my_score_2 = 0
-    total_my_score_3 = 0
-    total_my_score_4 = 0
-    total_my_score_5 = 0
+    methods = [('Negative Count', get_hinges_using_cross_correlation_negative),
+               ('Near Cross Correlations Avg', get_hinges_using_cross_correlation_avg),
+               ('Near Correlations Score', get_hinges_using_cross_correlation_avgs),
+               ('Correlation Distances', get_my_gnm_hinges_with_correlation_distance),
+               ('Simplest', get_my_hinges_with_correlation_simplest)]
+
+    total_scores_without_contact_map = [0] * len(methods)
+    total_scores_with_contact_map = [0] * len(methods)
+
     total_default_score = 0
 
-    def print_prediction_results(morph, ubi, header):
-        nonlocal total_my_score_1, total_my_score_2, total_my_score_3, total_my_score_4, total_my_score_5, total_default_score
+    def collect_prediction_results(morph, file_path, ubi, header):
+        nonlocal methods, total_scores_without_contact_map, total_scores_with_contact_map, total_default_score
 
         total_residue_count = len(morph.residues)
 
-        predicted_hinges_1 = get_hinges_using_cross_correlation_negative(ubi, header, None)
-        my_score_1 = score_prediction(predicted_hinges_1, morph.get_hinges(), total_residue_count)
-        total_my_score_1 += my_score_1
+        contact_map = contact_map_repository.get_contact_map_old(morph.morph_id, len(ubi))
+        if contact_map is None:
+            return
 
-        predicted_hinges_2 = get_hinges_using_cross_correlation_avg(ubi, header, None)
-        my_score_2 = score_prediction(predicted_hinges_2, morph.get_hinges(), total_residue_count)
-        total_my_score_2 += my_score_2
+        k_inv = calc_gnm_k_inv(ubi, header)
+        k_inv_with_contact = calc_gnm_k_inv(ubi, header, raptor_matrix=contact_map)
 
-        predicted_hinges_3 = get_hinges_using_cross_correlation_avgs(ubi, header, None)
-        my_score_3 = score_prediction(predicted_hinges_3, morph.get_hinges(), total_residue_count)
-        total_my_score_3 += my_score_3
+        for i, method in enumerate(methods):
+            desc = method[0]
+            func = method[1]
 
-        predicted_hinges_4 = get_my_gnm_hinges_with_correlation_distance(ubi, header, None)
-        my_score_4 = score_prediction(predicted_hinges_4, morph.get_hinges(), total_residue_count)
-        total_my_score_4 += my_score_4
+            predicted_hinges_without_contact_map = func(k_inv)
+            score_without_contact_map = score_prediction(predicted_hinges_without_contact_map,
+                                                         morph.get_hinges(), total_residue_count)
+            print(desc, "without contact map", predicted_hinges_without_contact_map, score_without_contact_map)
+            total_scores_without_contact_map[i] += score_without_contact_map
 
-        predicted_hinges_5 = get_my_hinges_with_correlation_simplest(ubi, header, None)
-        my_score_5 = score_prediction(predicted_hinges_5, morph.get_hinges(), total_residue_count)
-        total_my_score_5 += my_score_5
+            predicted_hinges_with_contact_map = func(k_inv_with_contact)
+            score_with_contact_map = score_prediction(predicted_hinges_with_contact_map,
+                                                         morph.get_hinges(), total_residue_count)
+            print(desc, "with contact map", predicted_hinges_with_contact_map, score_with_contact_map)
+            total_scores_with_contact_map[i] += score_with_contact_map
 
         default_hinges = get_hinges_default(ubi, header)
         default_score = score_prediction(default_hinges, morph.get_hinges(), total_residue_count)
         total_default_score += default_score
 
-        print("Annotated Hinges: ", morph.get_hinges())
-        print("DEFAULT HINGES: ", default_hinges, default_score)
-        print("MY HINGES 1:", predicted_hinges_1, my_score_1)
-        print("MY HINGES 2:", predicted_hinges_2, my_score_2)
-        print("MY HINGES 3:", predicted_hinges_3, my_score_3)
-        print("MY HINGES 4:", predicted_hinges_4, my_score_4)
-        print("MY HINGES 5:", predicted_hinges_5, my_score_5)
 
 
     morphs_repository.perform_on_some_morphs_in_directory(lambda morph_id : morph_id in test_morph_ids,
-            print_prediction_results)
+            collect_prediction_results)
 
-    print("MY SCORE 1 IS: ", total_my_score_1)
-    print("MY SCORE 2 IS: ", total_my_score_2)
-    print("MY SCORE 3 IS: ", total_my_score_3)
-    print("MY SCORE 4 IS: ", total_my_score_4)
-    print("MY SCORE 5 IS: ", total_my_score_5)
-    print("DEFAULT SCORE IS: ", total_default_score)
+    for i, method in enumerate(methods):
+        desc = method[0]
+        print("Total Score for", desc, "without contact map", total_scores_without_contact_map[i])
+        print("Total Score for", desc, "with contact map", total_scores_with_contact_map[i])
+    print("Total default score:", total_default_score)
+
 
 if __name__ == "__main__":
     main()

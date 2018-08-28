@@ -16,10 +16,8 @@ class MorphsRepository:
         ff0_path = '%s/%s/ff0.pdb' % (self.morphs_pdb_directory, morph_id)
         if Path(ff0_path).is_file():
             ubi, header = parsePDB(ff0_path, subset='calpha', header=True)
-            func(morph, ubi, header, **func_kwargs)
+            func(morph, ff0_path, ubi, header, **func_kwargs)
 
-    def perform_on_all_morphs_in_directory(self, func, **kwargs):
-        self.perform_on_some_morphs_in_directory(lambda x: True, func, **kwargs)
 
     def perform_on_some_morphs_in_directory(self, morph_filter, func, **kwargs):
         directory = os.fsencode(self.morphs_pdb_directory)

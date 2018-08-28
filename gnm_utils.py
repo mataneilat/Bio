@@ -10,7 +10,7 @@ def get_hinges_default(ubi, header, cutoff=8, modeIndex=0):
     return gnm.getHinges(modeIndex)
 
 
-def calc_gnm_k_inv(ubi, header, raptor_matrix=None, cutoff=8, raptor_alpha=0.5, number_of_modes=2):
+def calc_gnm_k_inv(ubi, header, raptor_matrix=None, cutoff=8, raptor_alpha=0.7, number_of_modes=2):
 
     gnm = GNM('Ubiquitin')
 
