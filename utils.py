@@ -14,6 +14,14 @@ class Range:
         return self.start_idx >= other_range.start_idx and self.end_idx <= other_range.end_idx
 
 
+def upper_triangular_no_diagonal(mat):
+    (n, m) = mat.shape
+
+    if n != m:
+        raise ValueError("The matrix must be a square matrix")
+
+    return mat[np.triu_indices(m, 1)]
+
 def normalize_matrix(M):
     xmax, xmin = M.max(), M.min()
     return (M - xmin)/(xmax - xmin)

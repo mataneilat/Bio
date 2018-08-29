@@ -1,23 +1,24 @@
-
-from bio.gamma_functions import *
-from prody import GNM
 import numpy as np
+from prody import GNM
+
+from bio.nma.gamma_functions import *
+
 
 def get_hinges_default(ubi, header, cutoff=8, modeIndex=0):
-    gnm = GNM('Ubiquitin')
+    gnm = GNM()
     gnm.buildKirchhoff(ubi, cutoff=cutoff)
     gnm.calcModes()
     return gnm.getHinges(modeIndex)
 
 
-def calc_gnm_k_inv(ubi, header, raptor_matrix=None, cutoff=8, raptor_alpha=0.7, number_of_modes=2):
+def calc_gnm_k_inv(ubi, header, contact_map=None, cutoff=8, raptor_alpha=0.7, number_of_modes=2):
 
-    gnm = GNM('Ubiquitin')
+    gnm = GNM()
 
-    if raptor_matrix is None:
+    if contact_map is None:
         gnm.buildKirchhoff(ubi, cutoff=cutoff, gamma=SquaredDistanceGamma(cutoff))
     else:
-        gnm.buildKirchhoff(ubi, cutoff=cutoff, gamma=RaptorGamma(raptor_matrix, cutoff, raptor_alpha))
+        gnm.buildKirchhoff(ubi, cutoff=cutoff, gamma=ContactMapAndDistanceGamma(contact_map, cutoff, raptor_alpha))
 
     gnm.calcModes()
 

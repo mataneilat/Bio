@@ -67,6 +67,8 @@ def parse_batches(batches_dir_path):
                         current_sequence = ''
                     current_sequence += splitted_line[0].strip()
         print("Finished with", filename)
+    morph_ids.append(current_morph_id)
+    sequences.append(current_sequence)
     return morph_ids, sequences
 
 
@@ -95,7 +97,7 @@ def copy_contact_maps(raptor_id_to_morph_id, batch_raptor_output_dir_path, conta
 
 if __name__ == '__main__':
 
-    current_batch = 6
+    current_batch = 11
 
     batches_dir_path = '/Users/mataneilat/Documents/BioInfo/raptor_input'
     morph_ids, sequences = parse_batches(batches_dir_path)
