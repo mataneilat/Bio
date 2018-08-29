@@ -3,8 +3,8 @@
     This module contains the hinge predictors which do not use machine learning mechanisms.
 """
 
-from bio.prediction.prediction_commons import *
-from bio.utils import *
+from prediction.prediction_commons import *
+from utils import *
 import math
 import itertools
 

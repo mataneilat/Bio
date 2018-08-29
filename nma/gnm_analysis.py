@@ -1,7 +1,7 @@
 import numpy as np
 from prody import GNM
 
-from bio.nma.gamma_functions import *
+from nma.gamma_functions import *
 
 
 def get_hinges_default(ubi, header, cutoff=8, modeIndex=0):

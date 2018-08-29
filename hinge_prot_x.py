@@ -1,16 +1,75 @@
 
 import argparse
 import sys
-from bio.contact_map_repository import ContactMapRepository
-from bio.morphs_repository import MorphsRepository
-from bio.morphs_atlas_parser import parse_morphs_atlas_from_text
-from bio.prediction.tensorflow_prediction import *
-from bio.prediction.deterministic_prediction import *
-from bio.result_measures import *
-from prody import LOGGER
+from prody import parsePDB, LOGGER
 import logging
 
+from contact_map_repository import ContactMapRepository
+from morphs_repository import MorphsRepository
+from morphs_atlas_parser import parse_morphs_atlas_from_text
+from prediction.tensorflow_prediction import *
+from prediction.deterministic_prediction import *
+from result_measures import *
+
 LOCAL_SENSITIVITY = 7
+
+
+def setup_ml_predictor(args):
+    contact_map_repository = None
+    if args.atlas_contact_map_dir is not None:
+        contact_map_repository = ContactMapRepository(args.atlas_contact_map_dir)
+
+    morphs_repository = MorphsRepository(parse_morphs_atlas_from_text(args.hinge_atlas_file),
+                                         args.atlas_pdb_directory)
+
+    morphs_ids = list(morphs_repository.atlas_morphs.keys())
+
+    tensorflow_predictor = TensorFlowPredictor(LOCAL_SENSITIVITY)
+    tensorflow_predictor.train_model(morphs_repository, morphs_ids, contact_map_repository)
+
+    return tensorflow_predictor
+
+
+def setup_cca_predictor(args):
+    return 'Cross Correlation Average', CrossCorrelationAvgPredictor(LOCAL_SENSITIVITY)
+
+
+def setup_nca_predictor(args):
+    return 'Near Correlations Averages', NearCorrelationAvgsPredictor(LOCAL_SENSITIVITY)
+
+
+def setup_cd_predictor(args):
+    return 'Correlation Distance', CorrelationDistancePredictor(LOCAL_SENSITIVITY)
+
+
+def predict(args):
+
+    predictors = []
+
+    possible_predictors = ('cca', 'nca', 'cd', 'ml')
+
+    for possible_predictor in possible_predictors:
+        if args.method == possible_predictor or args.method == 'all':
+            setup_method = globals()['setup_%s_predictor' % args.method]
+            predictors.append(setup_method(args))
+
+    ubi, header = parsePDB(args.pdb, subset='calpha', header=True)
+
+    k_inv = None
+    if args.contact_map is None:
+        k_inv = calc_gnm_k_inv(ubi, header)
+    else:
+        k_inv = calc_gnm_k_inv(ubi, header, contact_map=args.contact_map)
+
+    for desc, predictor in predictors:
+
+        hinges = predictor.predict_hinges(k_inv)
+        print('Predictor:', desc, ';', 'Hinges:', hinges)
+
+    if args.method == 'old' or args.method == 'all':
+        print('Old Predictor Hinges:', get_hinges_default(ubi, header))
+
+
 
 def show_results(args):
 
@@ -23,9 +82,7 @@ def show_results(args):
     morphs_ids = list(morphs_repository.atlas_morphs.keys())
     test_morph_ids = morphs_ids
 
-    predictors = [('Cross Correlation Average', CrossCorrelationAvgPredictor(LOCAL_SENSITIVITY)),
-                  ('Near Correlations Averages', NearCorrelationAvgsPredictor(LOCAL_SENSITIVITY)),
-                  ('Correlation Distance', CorrelationDistancePredictor(LOCAL_SENSITIVITY))]
+    predictors = [setup_cca_predictor(args), setup_nca_predictor(args), setup_cd_predictor(args)]
 
     if not args.without_ml:
 
@@ -89,7 +146,7 @@ def show_results(args):
 
 
 def validate_predict(parser, args):
-    if args.method == 'ml':
+    if args.method == 'ml' or args.method == 'all':
         if args.hinge_atlas_file is None or args.atlas_pdb_directory is None:
             parser.print_help()
             sys.stderr.write("Error: When choosing the machine learning method, one must specify the atlas file and directory")
@@ -120,11 +177,10 @@ def add_prediction_parser(subparsers):
 
     predict_parser = subparsers.add_parser('predict', help='The command for normal hinge prediction')
 
-    predict_parser.add_argument('pdb_file',
-                                   help='The protein structure file for which hinge prediction is required')
-    predict_parser.add_argument('method', choices=['nc', 'ncca', 'ncs', 'cd', 'ml', 'old'],
+    predict_parser.add_argument('pdb', help='The protein structure for which hinge prediction is required')
+    predict_parser.add_argument('method', choices=['all', 'cca', 'nca', 'cd', 'ml', 'old'],
                                    help='The method to use for prediction')
-    predict_parser.add_argument('--contact_map', dest='atlas_contact_map_dir', help='Directory of contact maps for atlas proteins')
+    predict_parser.add_argument('--contact_map', dest='contact_map', help='Directory of contact maps for atlas proteins')
     predict_parser.add_argument('--hinge_atlas_file', dest='hinge_atlas_file',
                                    help='The atlas\' hinge annotations that should be given in case of machine learning prediction')
     predict_parser.add_argument('--atlas_pdb_directory', dest='atlas_pdb_directory',
@@ -148,6 +204,8 @@ def setup_arg_parser():
 def execute(args):
     if args.command == 'show_results':
         show_results(args)
+    if args.command == 'predict':
+        predict(args)
 
 if __name__ == '__main__':
 
@@ -156,16 +214,17 @@ if __name__ == '__main__':
     # Disable debug logging from prody
     LOGGER._logger.level = logging.INFO
 
-    args = parser.parse_args(['-log_level', 'DEBUG', 'show_results', '--hinge_atlas_file', './hingeatlas.txt',
-                              '--atlas_pdb_directory', '/Users/mataneilat/Downloads/hinge_atlas_nonredundant',
-                              '--atlas_contact_map_dir', '/Users/mataneilat/Documents/BioInfo/raptor_output/contact_maps',
-                              '-without_ml'])
+    # args = parser.parse_args(['-log_level', 'DEBUG', 'show_results', '--hinge_atlas_file', './hingeatlas.txt',
+    #                           '--atlas_pdb_directory', '/Users/mataneilat/Downloads/hinge_atlas_nonredundant',
+    #                           '--atlas_contact_map_dir', '/Users/mataneilat/Documents/BioInfo/raptor_output/contact_maps',
+    #                           '-without_ml'])
+
+    args = parser.parse_args(['-log_level', 'DEBUG', 'predict', '1acb', 'cd'])
 
     validate_arguments(parser, args)
 
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
-    logging.debug("WTHI")
 
     execute(args)
 

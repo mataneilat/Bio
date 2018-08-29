@@ -5,9 +5,9 @@
 import tensorflow as tf
 from tensorflow import keras
 
-from bio.nma.gnm_analysis import *
-from bio.prediction.prediction_commons import *
-from bio.utils import *
+from nma.gnm_analysis import *
+from prediction.prediction_commons import *
+from utils import *
 
 
 class TensorFlowPredictor(HingePredictor):
