@@ -109,7 +109,7 @@ def show_results(args):
         if contact_map_repository is None:
             k_inv = calc_gnm_k_inv(ubi, header)
         else:
-            contact_map = contact_map_repository.get_contact_map_old(morph.morph_id, len(ubi))
+            contact_map = contact_map_repository.get_contact_map_rr(morph.morph_id, len(ubi))
             if contact_map is None:
                 return
             k_inv = calc_gnm_k_inv(ubi, header, contact_map=contact_map)
@@ -214,12 +214,12 @@ if __name__ == '__main__':
     # Disable debug logging from prody
     LOGGER._logger.level = logging.INFO
 
-    # args = parser.parse_args(['-log_level', 'DEBUG', 'show_results', '--hinge_atlas_file', './hingeatlas.txt',
-    #                           '--atlas_pdb_directory', '/Users/mataneilat/Downloads/hinge_atlas_nonredundant',
-    #                           '--atlas_contact_map_dir', '/Users/mataneilat/Documents/BioInfo/raptor_output/contact_maps',
-    #                           '-without_ml'])
+    args = parser.parse_args(['-log_level', 'DEBUG', 'show_results', '--hinge_atlas_file', './hingeatlas.txt',
+                              '--atlas_pdb_directory', '/Users/mataneilat/Downloads/hinge_atlas_nonredundant',
+                              '--atlas_contact_map_dir', '/Users/mataneilat/Documents/BioInfo/raptor_output/contact_maps',
+                              '-without_ml'])
 
-    args = parser.parse_args(['-log_level', 'DEBUG', 'predict', '1acb', 'cd'])
+  #  args = parser.parse_args(['-log_level', 'DEBUG', 'predict', '1acb', 'cd'])
 
     validate_arguments(parser, args)
 

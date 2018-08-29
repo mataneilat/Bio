@@ -44,10 +44,10 @@ class ContactMapRepository:
     def __init__(self, contact_map_directory):
         self.contact_map_directory = contact_map_directory
 
-    def get_contact_map(self, morph_id, residue_count):
+    def get_contact_map_gcnn(self, morph_id, residue_count):
         return parse_gcnn_file(residue_count, os.path.join(self.contact_map_directory, morph_id + '.gcnn'))
 
-    def get_contact_map_old(self, morph_id, residue_count):
+    def get_contact_map_rr(self, morph_id, residue_count):
         return parse_rr_file(residue_count, os.path.join(self.contact_map_directory, morph_id + '.rr'))
 
 

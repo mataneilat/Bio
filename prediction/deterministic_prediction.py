@@ -34,13 +34,13 @@ class CorrelationDistancePredictor(HingePredictor):
         """
         (m,n) = k_inv.shape
 
-        correlations = [0] * m
+        confidence_levels = [0] * m
         for i in range(m):
             for d, k in itertools.product(range(self.local_sensitivity), range(self.local_sensitivity)):
                 if i-k >= 0 and i+d < m:
-                    correlations[i] += np.sum(np.square(k_inv[i-k,:] - k_inv[i+d,:]))
+                    confidence_levels[i] += np.sum(np.square(k_inv[i-k,:] - k_inv[i+d,:]))
 
-        return predict_hinges(correlations)
+        return predict_hinges(confidence_levels)
 
 
 class NearCorrelationAvgsPredictor(HingePredictor):

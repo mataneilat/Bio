@@ -48,7 +48,7 @@ class TensorFlowPredictor(HingePredictor):
                 k_inv = calc_gnm_k_inv(ubi, header, None)
             else:
                 # We should use the contact map
-                contact_map = contact_map_repository.get_contact_map_old(morph.morph_id, len(ubi))
+                contact_map = contact_map_repository.get_contact_map_rr(morph.morph_id, len(ubi))
                 if contact_map is None:
                     # Contact map is not found, continue
                     return

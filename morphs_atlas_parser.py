@@ -56,9 +56,6 @@ def parse_morphs_atlas_from_text(txt_file):
     return {morph.morph_id:morph for morph in morphs}
 
 
-
-
-
 def main():
     morphs = parse_morphs_atlas_from_text('./hingeatlas.txt')
     for morph in morphs:
