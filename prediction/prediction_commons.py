@@ -19,17 +19,19 @@ class HingePredictor(metaclass=abc.ABCMeta):
         pass
 
 
-def predict_hinges(predicted_confidence_levels, local_sensitivity=7, max_average_alpha=0.9, total_max_beta=0.7):
+def predict_hinges(predicted_confidence_levels, local_sensitivity, local_percentile, global_percentile, alpha_max):
     """
     Method for hinges prediction using the predicted confidence levels
     The hinge prediction uses local confidence as well as global confidence to predict the hinge using the given
     parameters.
     :param predicted_confidence_levels: List of confidence levels for each residue for being a hinge
     :param local_sensitivity:   A parameter that sets the local range taken into account for the prediction
-    :param max_average_alpha:   A weight parameter that determines how close we expect a predicted hinge to be closer
-                                to a local maximum than to a local average.
-    :param total_max_beta:  A parameter that gives a threshold for how far can a predicted hinge be from the global
-                            maximum.
+    :param local_percentile:    A hinge residue should be at the top local_percentile of its local neighborhood's
+                                confidence levels.
+    :param global_percentile:   A hinge residue should be at the top global_percentile of all residues' confidence
+                                levels.
+    :param alpha_max:           A hinge residue should have confidence level which is higher than
+                                alpha_max * <max confidence level>
     :return:    A list of residues that are predicted as hinges.
     """
 
@@ -37,16 +39,22 @@ def predict_hinges(predicted_confidence_levels, local_sensitivity=7, max_average
     hinges = []
 
     total_max = max(predicted_confidence_levels)
+    top_percentile = np.percentile(predicted_confidence_levels, global_percentile)
+
     for i in range(local_sensitivity, m-local_sensitivity):
 
-        prediction_subset = predicted_confidence_levels[max(0, i - local_sensitivity):min(m, i + local_sensitivity)]
-        subset_max = max(prediction_subset)
-        subset_average = np.average(np.array(prediction_subset))
-
         residue_confidence_level = predicted_confidence_levels[i]
-        if residue_confidence_level < max_average_alpha * subset_max + (1 - max_average_alpha) * subset_average:
+
+        if residue_confidence_level < top_percentile:
             continue
-        if residue_confidence_level < total_max_beta * total_max:
+        if residue_confidence_level < alpha_max * total_max:
             continue
+
+        prediction_subset = predicted_confidence_levels[max(0, i - local_sensitivity):min(m, i + local_sensitivity)]
+
+        if residue_confidence_level < np.percentile(prediction_subset, local_percentile):
+            continue
+
         hinges.append(i)
+
     return hinges

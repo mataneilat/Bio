@@ -40,7 +40,7 @@ class CorrelationDistancePredictor(HingePredictor):
                 if i-k >= 0 and i+d < m:
                     confidence_levels[i] += np.sum(np.square(k_inv[i-k,:] - k_inv[i+d,:]))
 
-        return predict_hinges(confidence_levels)
+        return predict_hinges(confidence_levels, self.local_sensitivity, 90, 95, 0)
 
 
 class NearCorrelationAvgsPredictor(HingePredictor):
@@ -82,7 +82,7 @@ class NearCorrelationAvgsPredictor(HingePredictor):
 
             prediction_scores[i] = (1 - self.alpha) * inter_avg - self.alpha * cross_avg
 
-        return predict_hinges(prediction_scores)
+        return predict_hinges(prediction_scores, self.local_sensitivity, 80, 0, 0.7)
 
 
 class CrossCorrelationAvgPredictor(HingePredictor):
@@ -119,4 +119,4 @@ class CrossCorrelationAvgPredictor(HingePredictor):
 
             prediction_scores[i] = math.exp(-cross_avg)
 
-        return predict_hinges(prediction_scores, max_average_alpha=0.95, total_max_beta=0.95)
+        return predict_hinges(prediction_scores, self.local_sensitivity, 90, 95, 0.3)

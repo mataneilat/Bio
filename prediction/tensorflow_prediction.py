@@ -62,7 +62,9 @@ class TensorFlowPredictor(HingePredictor):
             morph_train_labels = []
 
             for i in range(local_sensitivity, m - local_sensitivity):
-                morph_train_data.append(get_maximum_sub_matrix_around_diagonal_element(k_inv, i, local_sensitivity))
+                sub_matrix = get_maximum_sub_matrix_around_diagonal_element(k_inv, i, local_sensitivity)
+                sub_matrix -= np.mean(sub_matrix)
+                morph_train_data.append(sub_matrix)
                 morph_train_labels.append(1 if i in annotated_hinges else 0)
 
             train_data += morph_train_data
@@ -84,13 +86,14 @@ class TensorFlowPredictor(HingePredictor):
         :param  contact_map_repository: The repository containing the contact maps corresponding to the morphs.
                                         In case this parameter is None, contact maps are not used as a part of training.
         """
-        dim = self.local_sensitivity * 2 + 1
-
         model = keras.Sequential([
-           keras.layers.Conv2D(data_format="channels_last", input_shape=(dim,dim,1),
-                               filters=8, kernel_size=[2, 2], activation=tf.nn.relu),
             keras.layers.Flatten(),
-            keras.layers.Dense(4, activation=tf.nn.relu),
+            keras.layers.Dense(32, activation=tf.nn.relu,
+                               kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=5e-4)),
+            keras.layers.Dropout(0.5),
+            keras.layers.Dense(4, activation=tf.nn.relu,
+                               kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=5e-4)),
+            keras.layers.Dropout(0.25),
             keras.layers.Dense(1, activation=tf.nn.sigmoid)
         ])
 
@@ -98,11 +101,7 @@ class TensorFlowPredictor(HingePredictor):
 
         train_data, train_labels = self._prepare_train_data(morphs_repository, train_morphs_ids, contact_map_repository)
 
-        # Reshape data for model
-        train_data = np.array(train_data)
-        train_data = train_data.reshape(train_data.shape[0], train_data.shape[1], train_data.shape[2], 1)
-
-        model.fit(train_data, np.array(train_labels), epochs=5)
+        model.fit(np.array(train_data), np.array(train_labels), epochs=5)
 
         self.model = model
 
@@ -119,9 +118,9 @@ class TensorFlowPredictor(HingePredictor):
         predictions = [0] * m
         for i in range(self.local_sensitivity, m - self.local_sensitivity):
             sub_matrix = get_maximum_sub_matrix_around_diagonal_element(k_inv, i, self.local_sensitivity)
+            sub_matrix -= np.mean(sub_matrix)
             sub_matrix_wrapped = np.array([sub_matrix])
-            result = self.model.predict(sub_matrix.reshape(sub_matrix_wrapped.shape[0], sub_matrix_wrapped.shape[1],
-                                                      sub_matrix_wrapped.shape[2], 1))
+            result = self.model.predict(sub_matrix_wrapped)
             predictions[i] = result[0][0]
         return predictions
 
@@ -133,5 +132,5 @@ class TensorFlowPredictor(HingePredictor):
         :return:    The predicted hinge residues
         """
         predicted_confidence_levels = self._predict_confidence_levels(k_inv)
-        return predict_hinges(predicted_confidence_levels)
+        return predict_hinges(predicted_confidence_levels, self.local_sensitivity, 90, 95, 0)
 
