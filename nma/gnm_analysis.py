@@ -2,7 +2,8 @@ import numpy as np
 from prody import GNM
 
 from nma.gamma_functions import *
-
+from benchmark import Benchmark
+import time
 
 def get_hinges_default(ubi, header, cutoff=8, modeIndex=0):
     gnm = GNM()
@@ -11,16 +12,25 @@ def get_hinges_default(ubi, header, cutoff=8, modeIndex=0):
     return gnm.getHinges(modeIndex)
 
 
-def calc_gnm_k_inv(ubi, header, contact_map=None, cutoff=8, raptor_alpha=0.7, number_of_modes=2):
+def calc_gnm_k_inv(ubi, header, contact_map=None, cutoff=8, raptor_alpha=0.5, number_of_modes=2):
 
+    benchmark = Benchmark()
     gnm = GNM()
 
+    before_kirchhoff = time.time()
     if contact_map is None:
         gnm.buildKirchhoff(ubi, cutoff=cutoff, gamma=SquaredDistanceGamma(cutoff))
     else:
         gnm.buildKirchhoff(ubi, cutoff=cutoff, gamma=ContactMapAndDistanceGamma(contact_map, cutoff, raptor_alpha))
+    after_kirchhoff = time.time()
 
+    benchmark.update(len(ubi), 'kirchoff', after_kirchhoff - before_kirchhoff)
+
+    before_calc_modes = time.time()
     gnm.calcModes()
+    after_calc_modes = time.time()
+
+    benchmark.update(len(ubi), 'calc_modes', after_calc_modes - before_calc_modes)
 
     if gnm._array is None:
         raise ValueError('Modes are not calculated.')
@@ -32,9 +42,13 @@ def calc_gnm_k_inv(ubi, header, contact_map=None, cutoff=8, raptor_alpha=0.7, nu
     (m, n) = V.shape
     k_inv = np.zeros((m,m))
 
+    before_k_inv = time.time()
     for i in range(number_of_modes):
         eigenvalue = eigvals[i]
         eigenvector = V[:,i]
         k_inv += (np.outer(eigenvector, eigenvector) / eigenvalue)
+    after_k_inv = time.time()
+
+    benchmark.update(len(ubi), 'k_inv', after_k_inv - before_k_inv)
 
     return k_inv

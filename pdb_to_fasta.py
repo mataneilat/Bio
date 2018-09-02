@@ -1,10 +1,9 @@
 
-from Bio import PDB
 from Bio import SeqIO
 from Bio.SeqIO import PdbIO
-from bio.morphs_repository import *
-from bio.morphs_atlas_parser import *
-from bio.utils import *
+from morphs_repository import *
+from morphs_atlas_parser import *
+from utils import *
 
 morphs_repository = MorphsRepository(parse_morphs_atlas_from_text('./hingeatlas.txt'),
                                     '/Users/mataneilat/Downloads/hinge_atlas_nonredundant')

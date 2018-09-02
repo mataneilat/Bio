@@ -2,8 +2,9 @@
     This module contains methods and classes which are commonly used around the prediction package
 """
 import numpy as np
-
 import abc
+import time
+from benchmark import Benchmark
 
 class HingePredictor(metaclass=abc.ABCMeta):
     """
@@ -41,6 +42,7 @@ def predict_hinges(predicted_confidence_levels, local_sensitivity, local_percent
     total_max = max(predicted_confidence_levels)
     top_percentile = np.percentile(predicted_confidence_levels, global_percentile)
 
+    before_prediction = time.time()
     for i in range(local_sensitivity, m-local_sensitivity):
 
         residue_confidence_level = predicted_confidence_levels[i]
@@ -56,5 +58,8 @@ def predict_hinges(predicted_confidence_levels, local_sensitivity, local_percent
             continue
 
         hinges.append(i)
+    after_prediction = time.time()
+
+    Benchmark().update(m, 'Hinge Prediction', after_prediction - before_prediction)
 
     return hinges

@@ -8,6 +8,8 @@ from tensorflow import keras
 from nma.gnm_analysis import *
 from prediction.prediction_commons import *
 from utils import *
+import time
+from benchmark import Benchmark
 
 
 class TensorFlowPredictor(HingePredictor):
@@ -131,6 +133,9 @@ class TensorFlowPredictor(HingePredictor):
         :param  k_inv: The inverted matrix produced by the GNM analysis which is interpreted as a correlation matrix.
         :return:    The predicted hinge residues
         """
+        before_tf = time.time()
         predicted_confidence_levels = self._predict_confidence_levels(k_inv)
+        after_tf = time.time()
+        Benchmark().update(k_inv.shape[0], 'Tensor Flow', after_tf - before_tf)
         return predict_hinges(predicted_confidence_levels, self.local_sensitivity, 90, 95, 0)
 

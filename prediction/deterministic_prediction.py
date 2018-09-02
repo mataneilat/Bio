@@ -7,9 +7,11 @@ from prediction.prediction_commons import *
 from utils import *
 import math
 import itertools
+from benchmark import Benchmark
+import time
+import scipy.spatial as spt
 
-
-class CorrelationDistancePredictor(HingePredictor):
+class CorrelationVectorsDistancePredictor(HingePredictor):
     """
     This predictor follows the following reasoning in order to predict a hinge:
     For every residue [i] , this predictor calculates the squared distance between the correlations of preceding and
@@ -35,12 +37,20 @@ class CorrelationDistancePredictor(HingePredictor):
         (m,n) = k_inv.shape
 
         confidence_levels = [0] * m
-        for i in range(m):
-            for d, k in itertools.product(range(self.local_sensitivity), range(self.local_sensitivity)):
-                if i-k >= 0 and i+d < m:
-                    confidence_levels[i] += np.sum(np.square(k_inv[i-k,:] - k_inv[i+d,:]))
 
-        return predict_hinges(confidence_levels, self.local_sensitivity, 90, 95, 0)
+        before_cvd = time.time()
+        for i in range(m):
+            forward = min(m-i, self.local_sensitivity)
+            backward = min(i, self.local_sensitivity - 1)
+
+            distances = spt.distance.squareform(spt.distance.pdist(k_inv[i - backward:i + forward,:],
+                                                                   'sqeuclidean'))
+
+            confidence_levels[i] = np.sum(distances[:backward,backward+1:])
+
+        after_cvd = time.time()
+        Benchmark().update(m, 'CVD confidence', after_cvd - before_cvd)
+        return predict_hinges(confidence_levels, self.local_sensitivity, 90, 95, 0.2)
 
 
 class NearCorrelationAvgsPredictor(HingePredictor):
@@ -67,22 +77,26 @@ class NearCorrelationAvgsPredictor(HingePredictor):
         :return:    The predicted hinge residues
         """
         (m,n) = k_inv.shape
-        prediction_scores = [0] * m
+        confidence_levels = [0] * m
 
+        before_nca = time.time()
         for i in range(1, m-1):
 
-            sub_matrix = get_maximum_sub_matrix_around_diagonal_element(k_inv, i, self.local_sensitivity)
+            neighborhood_matrix = get_maximum_sub_matrix_around_diagonal_element(k_inv, i, self.local_sensitivity)
 
-            left_up, right_bottom, cross = get_block_metrics_around_center(sub_matrix)
+            left_up, right_bottom, cross = get_block_metrics_around_center(neighborhood_matrix)
 
             inter_avg = np.average(np.append(upper_triangular_no_diagonal(left_up),
                                              upper_triangular_no_diagonal(right_bottom)))
 
             cross_avg = np.average(cross)
 
-            prediction_scores[i] = (1 - self.alpha) * inter_avg - self.alpha * cross_avg
+            confidence_levels[i] = (1 - self.alpha) * inter_avg - self.alpha * cross_avg
 
-        return predict_hinges(prediction_scores, self.local_sensitivity, 80, 0, 0.7)
+        after_nca = time.time()
+        Benchmark().update(m, 'NCA confidence', after_nca - before_nca)
+
+        return predict_hinges(confidence_levels, self.local_sensitivity, 80, 0, 0.7)
 
 
 class CrossCorrelationAvgPredictor(HingePredictor):
@@ -107,16 +121,18 @@ class CrossCorrelationAvgPredictor(HingePredictor):
         """
         (n,m) = k_inv.shape
 
-        prediction_scores = [0] * m
+        confidence_levels = [0] * m
 
+        before_cca = time.time()
         for i in range(1, m - 1):
 
-            sub_matrix = get_maximum_sub_matrix_around_diagonal_element(k_inv, i, self.local_sensitivity)
+            neighborhood_matrix = get_maximum_sub_matrix_around_diagonal_element(k_inv, i, self.local_sensitivity)
 
-            left_up, right_bottom, cross = get_block_metrics_around_center(sub_matrix)
+            left_up, right_bottom, cross = get_block_metrics_around_center(neighborhood_matrix)
 
             cross_avg = np.average(cross)
 
-            prediction_scores[i] = math.exp(-cross_avg)
-
-        return predict_hinges(prediction_scores, self.local_sensitivity, 90, 95, 0.3)
+            confidence_levels[i] = math.exp(-cross_avg)
+        after_cca = time.time()
+        Benchmark().update(m, 'CCA confidence', after_cca - before_cca)
+        return predict_hinges(confidence_levels, self.local_sensitivity, 90, 95, 0.3)

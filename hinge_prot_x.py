@@ -13,7 +13,6 @@ from result_measures import *
 
 LOCAL_SENSITIVITY = 7
 
-
 def setup_ml_predictor(args):
     contact_map_repository = None
     if args.atlas_contact_map_dir is not None:
@@ -39,14 +38,14 @@ def setup_nca_predictor(args):
 
 
 def setup_cd_predictor(args):
-    return 'Correlation Distance', CorrelationDistancePredictor(LOCAL_SENSITIVITY)
+    return 'Correlation Distance', CorrelationVectorsDistancePredictor(LOCAL_SENSITIVITY)
 
 
 def predict(args):
 
     predictors = []
 
-    possible_predictors = ('cca', 'nca', 'cd', 'ml')
+    possible_predictors = ('cca', 'nca', 'cvd', 'ml')
 
     for possible_predictor in possible_predictors:
         if args.method == possible_predictor or args.method == 'all':
@@ -178,7 +177,7 @@ def add_prediction_parser(subparsers):
     predict_parser = subparsers.add_parser('predict', help='The command for normal hinge prediction')
 
     predict_parser.add_argument('pdb', help='The protein structure for which hinge prediction is required')
-    predict_parser.add_argument('method', choices=['all', 'cca', 'nca', 'cd', 'ml', 'old'],
+    predict_parser.add_argument('method', choices=['all', 'cca', 'nca', 'cvd', 'ml', 'old'],
                                    help='The method to use for prediction')
     predict_parser.add_argument('--contact_map', dest='contact_map', help='Directory of contact maps for atlas proteins')
     predict_parser.add_argument('--hinge_atlas_file', dest='hinge_atlas_file',
@@ -228,5 +227,6 @@ if __name__ == '__main__':
 
     execute(args)
 
+  #  Benchmark().plot_benchmark()
 
 
