@@ -45,7 +45,7 @@ class Benchmark(metaclass=Singleton):
             subplt_counter += 1
 
         plt.subplots_adjust(top=0.92, bottom=0.08, left=0.10, right=0.95, hspace=0.45,
-                        wspace=0.35)
+                        wspace=0.45)
         plt.show()
 
 

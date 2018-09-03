@@ -12,7 +12,7 @@ import time
 from benchmark import Benchmark
 
 
-class TensorFlowPredictor(HingePredictor):
+class NeighborhoodDeepLearningPredictor(HingePredictor):
     """
     This predictor tries to employ machine learning techniques on the local inter-residue correlations in order to
     predict whether a given residues is a hinge or not

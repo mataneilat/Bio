@@ -24,13 +24,13 @@ def calc_gnm_k_inv(ubi, header, contact_map=None, cutoff=8, raptor_alpha=0.5, nu
         gnm.buildKirchhoff(ubi, cutoff=cutoff, gamma=ContactMapAndDistanceGamma(contact_map, cutoff, raptor_alpha))
     after_kirchhoff = time.time()
 
-    benchmark.update(len(ubi), 'kirchoff', after_kirchhoff - before_kirchhoff)
+    benchmark.update(len(ubi), 'Springs Setup', after_kirchhoff - before_kirchhoff)
 
     before_calc_modes = time.time()
     gnm.calcModes()
     after_calc_modes = time.time()
 
-    benchmark.update(len(ubi), 'calc_modes', after_calc_modes - before_calc_modes)
+    benchmark.update(len(ubi), 'Eigenvalues Find', after_calc_modes - before_calc_modes)
 
     if gnm._array is None:
         raise ValueError('Modes are not calculated.')
@@ -49,6 +49,6 @@ def calc_gnm_k_inv(ubi, header, contact_map=None, cutoff=8, raptor_alpha=0.5, nu
         k_inv += (np.outer(eigenvector, eigenvector) / eigenvalue)
     after_k_inv = time.time()
 
-    benchmark.update(len(ubi), 'k_inv', after_k_inv - before_k_inv)
+    benchmark.update(len(ubi), 'Gamma Inversion', after_k_inv - before_k_inv)
 
     return k_inv

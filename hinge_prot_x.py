@@ -13,7 +13,15 @@ from result_measures import *
 
 LOCAL_SENSITIVITY = 7
 
-def setup_ml_predictor(args):
+
+def initialize_ndl_predictor(morphs_repository, morphs_ids, contact_map_repository):
+    tensorflow_predictor = NeighborhoodDeepLearningPredictor(LOCAL_SENSITIVITY)
+    tensorflow_predictor.train_model(morphs_repository, morphs_ids, contact_map_repository)
+
+    return 'Neighborhood Deep Learning', tensorflow_predictor
+
+
+def setup_ndl_predictor(args):
     contact_map_repository = None
     if args.atlas_contact_map_dir is not None:
         contact_map_repository = ContactMapRepository(args.atlas_contact_map_dir)
@@ -23,10 +31,7 @@ def setup_ml_predictor(args):
 
     morphs_ids = list(morphs_repository.atlas_morphs.keys())
 
-    tensorflow_predictor = TensorFlowPredictor(LOCAL_SENSITIVITY)
-    tensorflow_predictor.train_model(morphs_repository, morphs_ids, contact_map_repository)
-
-    return tensorflow_predictor
+    return initialize_ndl_predictor(morphs_repository, morphs_ids, contact_map_repository)
 
 
 def setup_cca_predictor(args):
@@ -37,19 +42,19 @@ def setup_nca_predictor(args):
     return 'Near Correlations Averages', NearCorrelationAvgsPredictor(LOCAL_SENSITIVITY)
 
 
-def setup_cd_predictor(args):
-    return 'Correlation Distance', CorrelationVectorsDistancePredictor(LOCAL_SENSITIVITY)
+def setup_cvd_predictor(args):
+    return 'Correlation Vectors Distance', CorrelationVectorsDistancePredictor(LOCAL_SENSITIVITY)
 
 
 def predict(args):
 
     predictors = []
 
-    possible_predictors = ('cca', 'nca', 'cvd', 'ml')
+    possible_predictors = ('cca', 'nca', 'cvd', 'ndl')
 
     for possible_predictor in possible_predictors:
         if args.method == possible_predictor or args.method == 'all':
-            setup_method = globals()['setup_%s_predictor' % args.method]
+            setup_method = globals()['setup_%s_predictor' % possible_predictor]
             predictors.append(setup_method(args))
 
     ubi, header = parsePDB(args.pdb, subset='calpha', header=True)
@@ -65,8 +70,8 @@ def predict(args):
         hinges = predictor.predict_hinges(k_inv)
         print('Predictor:', desc, ';', 'Hinges:', hinges)
 
-    if args.method == 'old' or args.method == 'all':
-        print('Old Predictor Hinges:', get_hinges_default(ubi, header))
+    if args.method == 'prody' or args.method == 'all':
+        print('ProDy Predictor Hinges:', get_hinges_default(ubi, header))
 
 
 
@@ -81,19 +86,16 @@ def show_results(args):
     morphs_ids = list(morphs_repository.atlas_morphs.keys())
     test_morph_ids = morphs_ids
 
-    predictors = [setup_cca_predictor(args), setup_nca_predictor(args), setup_cd_predictor(args)]
+    predictors = [setup_cca_predictor(args), setup_nca_predictor(args), setup_cvd_predictor(args)]
 
-    if not args.without_ml:
+    if not args.without_dl:
 
         # In case we use machine learning, a portion of the morphs are are used to train the machine, and the others
         # are being used as test morphs
         train_morph_ids = morphs_ids[:150]
         test_morph_ids = morphs_ids[150:]
 
-        tensorflow_predictor = TensorFlowPredictor(LOCAL_SENSITIVITY)
-        tensorflow_predictor.train_model(morphs_repository, train_morph_ids, contact_map_repository)
-
-        predictors.append(('Tensor Flow', tensorflow_predictor))
+        predictors.append(initialize_ndl_predictor(morphs_repository, train_morph_ids, contact_map_repository))
 
     total_scores = [0] * len(predictors)
 
@@ -123,13 +125,13 @@ def show_results(args):
             predicted_hinges = predictor_class.predict_hinges(k_inv)
             prediction_score = calculate_mcc(predicted_hinges, morph.get_hinges(), total_residue_count)
 
-            logging.debug('Predictor: %s ; Hinges: %s ; Score: %s' % (desc, predicted_hinges, prediction_score))
+            logging.debug('Predictor: %s ; Hinges: %s ; MCC: %s' % (desc, predicted_hinges, prediction_score))
             total_scores[i] += prediction_score
 
         default_hinges = get_hinges_default(ubi, header)
         default_score = calculate_mcc(default_hinges, morph.get_hinges(), total_residue_count)
 
-        logging.debug('Old predictor hinges: %s ; Score: %s' % (default_hinges, default_score))
+        logging.debug('ProDy predictor hinges: %s ; MCC: %s' % (default_hinges, default_score))
         logging.debug('-----------------')
         total_default_score += default_score
 
@@ -138,14 +140,13 @@ def show_results(args):
 
     for i, predictor in enumerate(predictors):
         desc = predictor[0]
-        print("Total Score for", desc, total_scores[i] / len(test_morph_ids))
+        print(desc, "Average MCC", total_scores[i] / len(test_morph_ids))
 
-    print("Total default score:", total_default_score / len(test_morph_ids))
-
+    print("Prody Average MCC:", total_default_score / len(test_morph_ids))
 
 
 def validate_predict(parser, args):
-    if args.method == 'ml' or args.method == 'all':
+    if args.method == 'ndl' or args.method == 'all':
         if args.hinge_atlas_file is None or args.atlas_pdb_directory is None:
             parser.print_help()
             sys.stderr.write("Error: When choosing the machine learning method, one must specify the atlas file and directory")
@@ -153,6 +154,10 @@ def validate_predict(parser, args):
 
 
 def validate_arguments(parser, args):
+    if args.command is None:
+        parser.print_help()
+        sys.stderr.write("Error: No method was chosen")
+        sys.exit(2)
     if args.command == 'predict':
         validate_predict(parser, args)
 
@@ -161,7 +166,7 @@ def add_show_results_parser(subparsers):
 
     show_results_parser = subparsers.add_parser('show_results', help='The command for showing hinge prediction results')
 
-    show_results_parser.add_argument('-without_ml', action='store_true')
+    show_results_parser.add_argument('-without_dl', action='store_true')
 
     show_results_parser.add_argument('--hinge_atlas_file', dest='hinge_atlas_file', required=True,
                                    help='The atlas of hinge annotations that should be given in case of machine learning prediction')
@@ -177,7 +182,7 @@ def add_prediction_parser(subparsers):
     predict_parser = subparsers.add_parser('predict', help='The command for normal hinge prediction')
 
     predict_parser.add_argument('pdb', help='The protein structure for which hinge prediction is required')
-    predict_parser.add_argument('method', choices=['all', 'cca', 'nca', 'cvd', 'ml', 'old'],
+    predict_parser.add_argument('method', choices=['all', 'cca', 'nca', 'cvd', 'ndl', 'prody'],
                                    help='The method to use for prediction')
     predict_parser.add_argument('--contact_map', dest='contact_map', help='Directory of contact maps for atlas proteins')
     predict_parser.add_argument('--hinge_atlas_file', dest='hinge_atlas_file',
@@ -200,11 +205,13 @@ def setup_arg_parser():
 
     return parser
 
+
 def execute(args):
     if args.command == 'show_results':
         show_results(args)
     if args.command == 'predict':
         predict(args)
+
 
 if __name__ == '__main__':
 
@@ -213,15 +220,9 @@ if __name__ == '__main__':
     # Disable debug logging from prody
     LOGGER._logger.level = logging.INFO
 
-    args = parser.parse_args(['-log_level', 'DEBUG', 'show_results', '--hinge_atlas_file', './hingeatlas.txt',
-                              '--atlas_pdb_directory', '/Users/mataneilat/Downloads/hinge_atlas_nonredundant',
-                              '--atlas_contact_map_dir', '/Users/mataneilat/Documents/BioInfo/raptor_output/contact_maps',
-                              '-without_ml'])
-
-  #  args = parser.parse_args(['-log_level', 'DEBUG', 'predict', '1acb', 'cd'])
+    args = parser.parse_args()
 
     validate_arguments(parser, args)
-
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
 

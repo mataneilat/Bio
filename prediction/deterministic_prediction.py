@@ -6,7 +6,6 @@
 from prediction.prediction_commons import *
 from utils import *
 import math
-import itertools
 from benchmark import Benchmark
 import time
 import scipy.spatial as spt
@@ -81,10 +80,12 @@ class NearCorrelationAvgsPredictor(HingePredictor):
 
         before_nca = time.time()
         for i in range(1, m-1):
+            forward = min(m-i-1, self.local_sensitivity)
+            backward = min(i, self.local_sensitivity)
 
-            neighborhood_matrix = get_maximum_sub_matrix_around_diagonal_element(k_inv, i, self.local_sensitivity)
-
-            left_up, right_bottom, cross = get_block_metrics_around_center(neighborhood_matrix)
+            cross = k_inv[i+1:i+forward+1, i-backward:i]
+            left_up = k_inv[i-backward:i, i-backward:i]
+            right_bottom = k_inv[i+1:i+forward+1, i+1:i+forward+1]
 
             inter_avg = np.average(np.append(upper_triangular_no_diagonal(left_up),
                                              upper_triangular_no_diagonal(right_bottom)))
@@ -126,9 +127,10 @@ class CrossCorrelationAvgPredictor(HingePredictor):
         before_cca = time.time()
         for i in range(1, m - 1):
 
-            neighborhood_matrix = get_maximum_sub_matrix_around_diagonal_element(k_inv, i, self.local_sensitivity)
+            forward = min(m-i-1, self.local_sensitivity)
+            backward = min(i, self.local_sensitivity)
 
-            left_up, right_bottom, cross = get_block_metrics_around_center(neighborhood_matrix)
+            cross = k_inv[i+1:i+forward+1, i-backward:i]
 
             cross_avg = np.average(cross)
 
