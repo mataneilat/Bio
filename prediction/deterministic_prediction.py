@@ -10,6 +10,7 @@ from benchmark import Benchmark
 import time
 import scipy.spatial as spt
 
+
 class CorrelationVectorsDistancePredictor(HingePredictor):
     """
     This predictor follows the following reasoning in order to predict a hinge:

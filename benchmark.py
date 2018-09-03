@@ -1,17 +1,24 @@
 
-import matplotlib.pyplot as plt
+"""
+    Module containing benchmarking utilities
+"""
 
-class Singleton(type):
-    _instances = {}
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
+import matplotlib.pyplot as plt
+from utils import Singleton
 
 
 class Benchmark(metaclass=Singleton):
-
+    """
+    Singleton Benchmark class used throughout the system to report the execution times of different operations
+    """
     def update(self, N, operation_name, operation_time):
+        """
+        Update the benchmark with execution data
+
+        :param N:   The number of residues considered by the operation
+        :param operation_name:  The name of the operation
+        :param operation_time:  The time in second ot took for the operation to complete.
+        """
         if not hasattr(self, 'operation_to_times'):
             setattr(self, 'operation_to_times', {})
 
@@ -34,6 +41,9 @@ class Benchmark(metaclass=Singleton):
         return str(self.operation_to_times)
 
     def plot_benchmark(self):
+        """
+        Plots benchmark data.
+        """
         subplt_counter = 331
         for operation_name, times in self.operation_to_times.items():
             N_values = sorted(times.keys())

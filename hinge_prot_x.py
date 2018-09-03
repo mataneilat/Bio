@@ -1,4 +1,7 @@
 
+"""
+    The main execution file of the HingeProtX software
+"""
 import argparse
 import sys
 from prody import parsePDB, LOGGER
@@ -15,6 +18,15 @@ LOCAL_SENSITIVITY = 7
 
 
 def initialize_ndl_predictor(morphs_repository, morphs_ids, contact_map_repository):
+    """
+    Initializes and trains a NeighborhoodDeepLearningPredictor using the given parameters
+
+    :param morphs_repository:   The MorphsRepository which allows access to the proteins structure file and annotations
+    :param morphs_ids:  The IDs of morphs used for training
+    :param contact_map_repository:  The ContactMapRepository providing access to the proteins' contact maps
+
+    :return:    A tuple made out of the descriptive name of the predictor and the predictor itself
+    """
     tensorflow_predictor = NeighborhoodDeepLearningPredictor(LOCAL_SENSITIVITY)
     tensorflow_predictor.train_model(morphs_repository, morphs_ids, contact_map_repository)
 
@@ -22,6 +34,13 @@ def initialize_ndl_predictor(morphs_repository, morphs_ids, contact_map_reposito
 
 
 def setup_ndl_predictor(args):
+    """
+    Initializes a NeighborhoodDeepLearningPredictor using the command line arguments
+
+    :param args:    The parsed command line arguments.
+
+    :return:     A tuple made out of the descriptive name of the predictor and the predictor itself.
+    """
     contact_map_repository = None
     if args.atlas_contact_map_dir is not None:
         contact_map_repository = ContactMapRepository(args.atlas_contact_map_dir)
@@ -35,19 +54,45 @@ def setup_ndl_predictor(args):
 
 
 def setup_cca_predictor(args):
+    """
+    Initializes a CrossCorrelationAvgPredictor
+
+    :param args:    The parsed command line arguments.
+
+    :return:    A tuple made out of the descriptive name of the predictor and the predictor itself.
+    """
     return 'Cross Correlation Average', CrossCorrelationAvgPredictor(LOCAL_SENSITIVITY)
 
 
 def setup_nca_predictor(args):
+    """
+    Initializes a NearCorrelationAvgsPredictor
+
+    :param args:    The parsed command line arguments.
+
+    :return:    A tuple made out of the descriptive name of the predictor and the predictor itself.
+    """
     return 'Near Correlations Averages', NearCorrelationAvgsPredictor(LOCAL_SENSITIVITY)
 
 
 def setup_cvd_predictor(args):
+    """
+    Initializes a CorrelationVectorsDistancePredictor
+
+    :param args:    The parsed command line arguments.
+
+    :return:    A tuple made out of the descriptive name of the predictor and the predictor itself.
+    """
     return 'Correlation Vectors Distance', CorrelationVectorsDistancePredictor(LOCAL_SENSITIVITY)
 
 
 def predict(args):
+    """
+    Execute the predict command using the given command line arguments.
 
+    :param args:    The parsed command line arguments.
+
+    """
     predictors = []
 
     possible_predictors = ('cca', 'nca', 'cvd', 'ndl')
@@ -74,9 +119,13 @@ def predict(args):
         print('ProDy Predictor Hinges:', get_hinges_default(ubi, header))
 
 
-
 def show_results(args):
+    """
+    Executes the show_results command using the given command line arguments.
 
+    :param args:    The parsed command line arguments.
+
+    """
     contact_map_repository = None
     if args.atlas_contact_map_dir is not None:
         contact_map_repository = ContactMapRepository(args.atlas_contact_map_dir)
@@ -146,6 +195,13 @@ def show_results(args):
 
 
 def validate_predict(parser, args):
+    """
+    Validates the predict command arguments are valid.
+    In case the arguments are not valid, prints a message and exits.
+
+    :param parser:  The arguments parser
+    :param args:    The parsed arguments
+    """
     if args.method == 'ndl' or args.method == 'all':
         if args.hinge_atlas_file is None or args.atlas_pdb_directory is None:
             parser.print_help()
@@ -154,6 +210,14 @@ def validate_predict(parser, args):
 
 
 def validate_arguments(parser, args):
+    """
+    Validates the parsed arguments.
+
+    In case the arguments are not valid, prints a message and exits.
+
+    :param parser:  The arguments parser
+    :param args:    The parsed arguments
+    """
     if args.command is None:
         parser.print_help()
         sys.stderr.write("Error: No method was chosen")
@@ -163,7 +227,11 @@ def validate_arguments(parser, args):
 
 
 def add_show_results_parser(subparsers):
+    """
+    Adds a sub-parser for the show_results command
 
+    :param subparsers:  The collection of sub-parsers to add the created sub-parser to.
+    """
     show_results_parser = subparsers.add_parser('show_results', help='The command for showing hinge prediction results')
 
     show_results_parser.add_argument('-without_dl', action='store_true')
@@ -178,7 +246,11 @@ def add_show_results_parser(subparsers):
                         help='Directory of contact maps for atlas proteins')
 
 def add_prediction_parser(subparsers):
+    """
+    Adds a sub-parser for the predict command
 
+    :param subparsers:  The collection of sub-parsers to add the created sub-parser to.
+    """
     predict_parser = subparsers.add_parser('predict', help='The command for normal hinge prediction')
 
     predict_parser.add_argument('pdb', help='The protein structure for which hinge prediction is required')
@@ -194,6 +266,11 @@ def add_prediction_parser(subparsers):
 
 
 def setup_arg_parser():
+    """
+    Setup the parser for the command line arguments
+
+    :return:    The parser
+    """
     parser = argparse.ArgumentParser(prog='Hinge prediction software')
 
     parser.add_argument('-log_level', default='INFO', choices=['INFO', 'DEBUG', 'CRITICAL'], help='The logging level')
@@ -207,6 +284,11 @@ def setup_arg_parser():
 
 
 def execute(args):
+    """
+    Executes the program using the given command line arguments
+
+    :param args:    The parsed command line arguments.
+    """
     if args.command == 'show_results':
         show_results(args)
     if args.command == 'predict':

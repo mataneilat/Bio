@@ -1,8 +1,16 @@
 
+"""
+    This module contains the different gamma functions (used for defining the spring potential) for gnm analysis.
+"""
+
 from prody import Gamma
 
 class ContactMapAndDistanceGamma(Gamma):
 
+    """
+    This Gamma function uses both contact map information and atomic distance to determine the spring potential
+    between two residues.
+    """
 
     def __init__(self, contact_map, cutoff, alpha):
         self.contact_map = contact_map
@@ -28,6 +36,10 @@ class ContactMapAndDistanceGamma(Gamma):
 
 
 class SquaredDistanceGamma(Gamma):
+
+    """
+    This Gamma function uses the atomic distance to determine the spring potential between two residues.
+    """
 
     def __init__(self, cutoff):
         self.cutoff = cutoff

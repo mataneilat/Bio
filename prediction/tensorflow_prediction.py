@@ -126,7 +126,6 @@ class NeighborhoodDeepLearningPredictor(HingePredictor):
             predictions[i] = result[0][0]
         return predictions
 
-
     def predict_hinges(self, k_inv):
         """
         Predicts the hinge residues.
